@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verifica Lotofácil</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 760px; margin: 0 auto; padding: 16px; background: #f6f4fb; color: #222; }
+  h1 { color: #930089; }
+  label { display: block; margin: 12px 0 4px; font-weight: 600; }
+  input[type=text] { width: 100%; padding: 8px; font-size: 16px; box-sizing: border-box; }
+  button { margin-top: 12px; padding: 10px 20px; font-size: 16px; background: #930089; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
+  .erro { color: #c00; margin-top: 8px; }
+  .jogo { background: #fff; border-radius: 8px; padding: 12px; margin: 10px 0; box-shadow: 0 1px 3px #0002; }
+  .num { display: inline-block; width: 32px; line-height: 32px; text-align: center; margin: 2px; border-radius: 50%; background: #eee; }
+  .num.hit { background: #930089; color: #fff; font-weight: 700; }
+  .total { font-size: 20px; font-weight: 700; padding: 12px; background: #fff; border-radius: 8px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<h1>Verifica Lotofácil</h1>
+
+<label for="sorteio">Números sorteados (15, separados por espaço, vírgula ou |)</label>
+<input type="text" id="sorteio" placeholder="01 02 03 04 05 06 07 08 09 10 11 12 13 14 15">
+
+<label for="arquivo">Arquivo .txt com os jogos (um por linha, números separados por |)</label>
+<input type="file" id="arquivo" accept=".txt,text/plain">
+
+<button id="conferir">Conferir</button>
+<div id="erro" class="erro"></div>
+<div id="resultado"></div>
+
+<script>
+const PREMIOS = { 11: 7, 12: 14, 13: 35 };
+
+function parseNums(texto, sep) {
+  return texto.split(sep).map(s => s.trim()).filter(Boolean).map(Number);
+}
+
+function conferir(sorteados, jogos) {
+  const set = new Set(sorteados);
+  let total = 0, conferir = false;
+  const resultados = jogos.map(nums => {
+    const acertos = nums.filter(n => set.has(n)).length;
+    if (acertos >= 14) conferir = true;
+    total += PREMIOS[acertos] || 0;
+    return { nums, acertos };
+  });
+  return { resultados, total, conferir };
+}
+
+const brl = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+document.getElementById('conferir').onclick = async () => {
+  const erro = document.getElementById('erro');
+  const out = document.getElementById('resultado');
+  erro.textContent = ''; out.innerHTML = '';
+
+  const sorteados = parseNums(document.getElementById('sorteio').value, /[\s,|;]+/);
+  if (sorteados.length !== 15 || new Set(sorteados).size !== 15 || sorteados.some(n => !Number.isInteger(n) || n < 1 || n > 25)) {
+    erro.textContent = 'Informe 15 números distintos entre 1 e 25.'; return;
+  }
+  const file = document.getElementById('arquivo').files[0];
+  if (!file) { erro.textContent = 'Selecione o arquivo .txt.'; return; }
+
+  const jogos = (await file.text()).split(/\r?\n/).filter(l => l.trim()).map(l => parseNums(l, '|'));
+  if (!jogos.length) { erro.textContent = 'Arquivo sem jogos.'; return; }
+
+  const { resultados, total, conferir: aConferir } = conferir(sorteados, jogos);
+  const set = new Set(sorteados);
+
+  resultados.forEach(({ nums, acertos }, i) => {
+    const div = document.createElement('div');
+    div.className = 'jogo';
+    const premio = acertos >= 14 ? ' — valor a conferir' : PREMIOS[acertos] ? ` — ${brl(PREMIOS[acertos])}` : '';
+    div.innerHTML = `<strong>Jogo ${i + 1}: ${acertos} acertos${premio}</strong><br>` +
+      nums.map(n => `<span class="num${set.has(n) ? ' hit' : ''}">${String(n).padStart(2, '0')}</span>`).join('');
+    out.appendChild(div);
+  });
+
+  const t = document.createElement('div');
+  t.className = 'total';
+  t.textContent = aConferir ? 'Total: valor a conferir (teve jogo com 14 ou 15 acertos)' : `Total ganho: ${brl(total)}`;
+  out.appendChild(t);
+};
+</script>
+</body>
+</html>
